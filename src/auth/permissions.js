@@ -26,7 +26,6 @@ const PERMISSIONS = {
   marketing: {
     tracking: ['read'],
     coupons: ['read', 'write'],
-    agencies: ['read', 'write'],
   },
   viewer: {
     tracking: ['read'],
