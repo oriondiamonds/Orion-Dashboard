@@ -28,7 +28,7 @@ export default function Sidebar() {
   const modules = getAccessibleModules(user.role)
 
   return (
-    <aside className="w-60 bg-gray-900 text-white flex flex-col min-h-screen">
+    <aside className="w-60 bg-gray-900 text-white flex flex-col h-screen sticky top-0 shrink-0 overflow-y-auto">
       <div className="px-5 py-5 border-b border-gray-800">
         <div className="flex items-center gap-2">
           <Diamond className="w-6 h-6 text-indigo-400" />

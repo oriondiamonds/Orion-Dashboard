@@ -1,5 +1,6 @@
 import express from 'express'
 import { registerAuthRoutes } from './routes/auth.js'
+import { registerTrackingRoutes } from './routes/tracking.js'
 
 /**
  * Vite plugin that mounts API routes directly into Vite's dev server.
@@ -13,6 +14,7 @@ export function apiPlugin() {
 
       // Register all API routes
       registerAuthRoutes(app)
+      registerTrackingRoutes(app)
 
       app.get('/api/health', (req, res) => {
         res.json({ status: 'ok' })

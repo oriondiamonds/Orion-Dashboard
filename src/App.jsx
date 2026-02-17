@@ -4,6 +4,7 @@ import { ToastProvider } from './components/Toast.jsx'
 import ProtectedRoute from './auth/ProtectedRoute.jsx'
 import LoginPage from './auth/LoginPage.jsx'
 import Layout from './components/Layout.jsx'
+import TrackingPage from './modules/tracking/TrackingPage.jsx'
 
 // Placeholder pages — will be replaced as each module is built
 function PlaceholderPage({ title }) {
@@ -61,7 +62,7 @@ export default function App() {
                 path="tracking"
                 element={
                   <ProtectedRoute module="tracking">
-                    <PlaceholderPage title="Tracking & Analytics" />
+                    <TrackingPage />
                   </ProtectedRoute>
                 }
               />

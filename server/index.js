@@ -3,6 +3,7 @@ import express from 'express'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { registerAuthRoutes } from './routes/auth.js'
+import { registerTrackingRoutes } from './routes/tracking.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -13,6 +14,7 @@ app.use(express.json())
 
 // API routes
 registerAuthRoutes(app)
+registerTrackingRoutes(app)
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' })
