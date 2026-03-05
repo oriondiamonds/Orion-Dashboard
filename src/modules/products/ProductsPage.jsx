@@ -117,8 +117,20 @@ export default function AdminProductsPage() {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/products");
-      const data = await res.json();
+      const res = await fetch("/api/products", { cache: "no-store" });
+
+      // 304 can return an empty body in some deployments/caches.
+      if (res.status === 304) {
+        return;
+      }
+
+      const raw = await res.text();
+      const data = raw ? JSON.parse(raw) : {};
+
+      if (!res.ok) {
+        throw new Error(data.error || `Request failed: ${res.status}`);
+      }
+
       if (data.success) {
         setProducts(data.products);
         if (data.collections) setCollections(data.collections);
@@ -159,9 +171,16 @@ export default function AdminProductsPage() {
 
     try {
       const detailRes = await fetch(
-        `/api/products?detail=${product.id}`
+        `/api/products?detail=${product.id}`,
+        { cache: "no-store" }
       );
-      const detailData = await detailRes.json();
+      const detailRaw = await detailRes.text();
+      const detailData = detailRaw ? JSON.parse(detailRaw) : {};
+
+      if (!detailRes.ok) {
+        showMessage("error", detailData.error || "Failed to load product details");
+        return;
+      }
 
       if (detailData.error) {
         showMessage("error", detailData.error);
