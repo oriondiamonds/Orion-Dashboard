@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Plus,
   Pencil,
@@ -18,6 +18,7 @@ import {
   FolderOpen,
 } from "lucide-react";
 import { useToast } from "../../components/Toast.jsx";
+import { TypeaheadInput, TagTypeaheadInput } from "./TypeaheadInputs.jsx";
 
 const EMPTY_PRODUCT = {
   title: "",
@@ -68,6 +69,85 @@ function cartesian(...arrays) {
   );
 }
 
+const STATIC_SUGGESTIONS = {
+  title: [
+    "Luna Diamond Pendant",
+    "Stellar Halo Ring",
+    "Celeste Tennis Bracelet",
+    "Solstice Diamond Earrings",
+  ],
+  handle: ["diamond-ring", "diamond-earrings", "diamond-pendant", "diamond-bracelet"],
+  option_name: ["Gold Karat", "Gold Color", "Diamond Grade", "Ring Size"],
+  option_value: [
+    "10K",
+    "14K",
+    "18K",
+    "Rose Gold",
+    "Yellow Gold",
+    "White Gold",
+    "VS1",
+    "VVS2",
+    "H-I",
+  ],
+  collection: ["Rings", "Earrings", "Bracelets", "Pendants", "Best Sellers", "Featured"],
+  diamond_shapes: ["Round", "Oval", "Pear", "Princess", "Marquise", "Emerald"],
+  total_diamonds: ["1", "2", "8", "10", "24", "36"],
+  diamond_weight: ["0.01", "0.05", "0.10", "0.25", "0.50", "1.00"],
+};
+
+const PRESETS = {
+  Ring: {
+    options: [
+      { name: "Gold Karat", values: ["14K", "18K"] },
+      { name: "Gold Color", values: ["Rose Gold", "Yellow Gold", "White Gold"] },
+      { name: "Ring Size", values: ["6", "7", "8"] },
+    ],
+    pricing: { pricing_mode: "live" },
+  },
+  Earrings: {
+    options: [
+      { name: "Gold Karat", values: ["14K", "18K"] },
+      { name: "Gold Color", values: ["Rose Gold", "Yellow Gold", "White Gold"] },
+      { name: "Diamond Grade", values: ["VS1", "VVS2"] },
+    ],
+    pricing: { pricing_mode: "live" },
+  },
+  Bracelet: {
+    options: [
+      { name: "Gold Karat", values: ["14K", "18K"] },
+      { name: "Gold Color", values: ["Rose Gold", "Yellow Gold", "White Gold"] },
+      { name: "Length", values: ["6.5 in", "7 in", "7.5 in"] },
+    ],
+    pricing: { pricing_mode: "live" },
+  },
+  Pendant: {
+    options: [
+      { name: "Gold Karat", values: ["14K", "18K"] },
+      { name: "Gold Color", values: ["Rose Gold", "Yellow Gold", "White Gold"] },
+      { name: "Chain Length", values: ["16 in", "18 in", "20 in"] },
+    ],
+    pricing: { pricing_mode: "live" },
+  },
+};
+
+function normalizeCSV(input) {
+  return String(input || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .filter((item, index, arr) => arr.findIndex((a) => a.toLowerCase() === item.toLowerCase()) === index);
+}
+
+function mergeUnique(listA = [], listB = []) {
+  const out = [];
+  for (const value of [...listA, ...listB]) {
+    if (!value) continue;
+    if (out.find((item) => item.toLowerCase() === String(value).toLowerCase())) continue;
+    out.push(String(value).trim());
+  }
+  return out;
+}
+
 export default function AdminProductsPage() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -84,6 +164,20 @@ export default function AdminProductsPage() {
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({ ...EMPTY_PRODUCT });
   const [uploading, setUploading] = useState(false);
+  const [featuredImageIndex, setFeaturedImageIndex] = useState(0);
+  const [handleManuallyEdited, setHandleManuallyEdited] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [suggestionsByField, setSuggestionsByField] = useState({
+    title: [],
+    handle: [],
+    option_name: [],
+    option_value: [],
+    collection: [],
+    diamond_shapes: [],
+    total_diamonds: [],
+    diamond_weight: [],
+  });
+  const [collectionSearch, setCollectionSearch] = useState("");
 
   // Collapsible sections
   const [openSections, setOpenSections] = useState({
@@ -97,11 +191,45 @@ export default function AdminProductsPage() {
   });
   const [newCollectionTitle, setNewCollectionTitle] = useState("");
   const [creatingCollection, setCreatingCollection] = useState(false);
+  const suggestionCacheRef = useRef(new Map());
+  const suggestionDebounceRef = useRef(null);
+  const suggestionsAbortRef = useRef(null);
   const toast = useToast();
 
   useEffect(() => {
     fetchProducts();
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (suggestionDebounceRef.current) {
+        clearTimeout(suggestionDebounceRef.current);
+      }
+      if (suggestionsAbortRef.current) {
+        suggestionsAbortRef.current.abort();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    setSuggestionsByField((prev) => ({
+      ...prev,
+      collection: mergeUnique(
+        STATIC_SUGGESTIONS.collection,
+        collections.map((collection) => collection.title)
+      ),
+    }));
+  }, [collections]);
+
+  useEffect(() => {
+    if (!showForm || formData.options.length === 0) return;
+    try {
+      window.localStorage.setItem(
+        "dashboard:lastProductOptions",
+        JSON.stringify(formData.options)
+      );
+    } catch (_error) {}
+  }, [formData.options, showForm]);
 
   const showMessage = (type, text) => {
     setMessage({ type, text });
@@ -110,6 +238,139 @@ export default function AdminProductsPage() {
 
   const toggleSection = (key) => {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const requestSuggestions = (field, query) => {
+    const trimmed = String(query || "").trim();
+    const staticPool = STATIC_SUGGESTIONS[field] || [];
+    if (trimmed.length < 2) {
+      setSuggestionsByField((prev) => ({ ...prev, [field]: staticPool }));
+      return;
+    }
+
+    const cacheKey = `${field}:${trimmed.toLowerCase()}`;
+    if (suggestionCacheRef.current.has(cacheKey)) {
+      setSuggestionsByField((prev) => ({
+        ...prev,
+        [field]: suggestionCacheRef.current.get(cacheKey),
+      }));
+      return;
+    }
+
+    if (suggestionDebounceRef.current) clearTimeout(suggestionDebounceRef.current);
+    suggestionDebounceRef.current = setTimeout(async () => {
+      try {
+        if (suggestionsAbortRef.current) suggestionsAbortRef.current.abort();
+        suggestionsAbortRef.current = new AbortController();
+
+        const response = await fetch(
+          `/api/products/suggestions?field=${encodeURIComponent(field)}&q=${encodeURIComponent(trimmed)}`,
+          { signal: suggestionsAbortRef.current.signal, cache: "no-store" }
+        );
+        const payload = await response.json();
+        const dynamicItems = payload?.success ? payload.items || [] : [];
+        const staticItems = staticPool.filter((item) =>
+          item.toLowerCase().includes(trimmed.toLowerCase())
+        );
+        const items = mergeUnique(staticItems, dynamicItems);
+        suggestionCacheRef.current.set(cacheKey, items);
+        setSuggestionsByField((prev) => ({ ...prev, [field]: items }));
+      } catch (_error) {
+        const staticItems = staticPool.filter((item) =>
+          item.toLowerCase().includes(trimmed.toLowerCase())
+        );
+        setSuggestionsByField((prev) => ({ ...prev, [field]: staticItems }));
+      }
+    }, 250);
+  };
+
+  const selectedCollectionIds = formData.collection_ids || [];
+  const filteredCollections = useMemo(() => {
+    const q = collectionSearch.trim().toLowerCase();
+    if (!q) return collections;
+    return collections.filter((collection) =>
+      collection.title.toLowerCase().includes(q)
+    );
+  }, [collectionSearch, collections]);
+
+  const validateForm = () => {
+    const errors = {};
+    const title = formData.title.trim();
+    const handle = (formData.handle || slugify(title)).trim();
+
+    if (!title) errors.title = "Title is required.";
+    if (!handle) errors.handle = "Handle is required.";
+
+    const duplicate = products.find(
+      (product) =>
+        product.handle?.toLowerCase() === handle.toLowerCase() &&
+        product.id !== editingId
+    );
+    if (duplicate) errors.handle = `Handle "${handle}" already exists.`;
+
+    if (formData.pricing) {
+      const numericKeys = [
+        "weight_10k",
+        "weight_14k",
+        "weight_18k",
+        "diamond_price",
+        "gold_price_14k",
+        "making_charges",
+        "gst",
+        "price_10k",
+        "price_14k",
+        "price_18k",
+      ];
+      const invalidNumeric = numericKeys.find((key) => {
+        const rawValue = formData.pricing?.[key];
+        return rawValue !== "" && rawValue !== null && Number.isNaN(Number(rawValue));
+      });
+      if (invalidNumeric) errors.pricing = "Use numeric values for pricing inputs.";
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const applyPreset = (presetName) => {
+    const preset = PRESETS[presetName];
+    if (!preset) return;
+
+    const hasExisting = formData.options.length > 0 || formData.variants.length > 0;
+    if (hasExisting) {
+      const shouldApply = window.confirm(
+        `${presetName} preset will replace current options and variants. Continue?`
+      );
+      if (!shouldApply) return;
+    }
+
+    const presetOptions = preset.options.map((option) => ({
+      name: option.name,
+      values: [...option.values],
+    }));
+
+    setFormData((prev) => ({
+      ...prev,
+      options: presetOptions,
+      variants: [],
+      pricing: {
+        ...(prev.pricing || EMPTY_PRICING),
+        ...(preset.pricing || {}),
+      },
+    }));
+    toast.success(`${presetName} preset applied`);
+  };
+
+  const setFeaturedImage = (index) => {
+    setFeaturedImageIndex(index);
+    setFormData((prev) => ({
+      ...prev,
+      images: prev.images.map((image, imageIndex) =>
+        imageIndex === index
+          ? { ...image, alt_text: image.alt_text || prev.title || "Product image" }
+          : image
+      ),
+    }));
   };
 
   // ========== API calls ==========
@@ -144,16 +405,25 @@ export default function AdminProductsPage() {
 
   
   const handleCreate = () => {
+    let savedOptions = [];
+    try {
+      const raw = window.localStorage.getItem("dashboard:lastProductOptions");
+      if (raw) savedOptions = JSON.parse(raw);
+    } catch (_error) {}
     setEditingId(null);
     setFormData({
       ...EMPTY_PRODUCT,
       images: [],
-      options: [],
+      options: Array.isArray(savedOptions) ? savedOptions : [],
       variants: [],
       pricing: null,
       collection_ids: [],
     });
+    setFeaturedImageIndex(0);
+    setHandleManuallyEdited(false);
+    setFieldErrors({});
     setNewCollectionTitle("");
+    setCollectionSearch("");
     setOpenSections({
       basic: true,
       collections: true,
@@ -188,6 +458,14 @@ export default function AdminProductsPage() {
       }
 
       const p = detailData.product;
+      const incomingImages = (p.images || []).map((img) => ({
+        url: img.url,
+        alt_text: img.alt_text || "",
+      }));
+      const resolvedFeaturedIndex = Math.max(
+        0,
+        incomingImages.findIndex((image) => image.url === p.featured_image_url)
+      );
 
       setEditingId(product.id);
       setFormData({
@@ -197,10 +475,7 @@ export default function AdminProductsPage() {
         description_html: p.description_html || "",
         is_bestseller: p.is_bestseller ?? false,
         is_featured: p.is_featured ?? false,
-        images: (p.images || []).map((img) => ({
-          url: img.url,
-          alt_text: img.alt_text || "",
-        })),
+        images: incomingImages,
         options: (p.options || []).map((opt) => ({
           name: opt.name,
           values: opt.values || [],
@@ -236,7 +511,11 @@ export default function AdminProductsPage() {
           : null,
         collection_ids: p.collection_ids || [],
       });
+      setFeaturedImageIndex(resolvedFeaturedIndex);
+      setHandleManuallyEdited(true);
+      setFieldErrors({});
       setNewCollectionTitle("");
+      setCollectionSearch("");
       setOpenSections({
         basic: true,
         collections: true,
@@ -253,34 +532,32 @@ export default function AdminProductsPage() {
   };
 
   const handleSave = async () => {
-    
-    if (!formData.title) {
-      showMessage("error", "Product title is required");
+    if (!validateForm()) {
+      showMessage("error", "Please fix highlighted fields");
       return;
     }
 
     setSaving(true);
     try {
+      const normalizedHandle = (formData.handle || slugify(formData.title)).trim();
+      const normalizedOptions = formData.options.map((opt) => ({
+        name: String(opt.name || "").trim(),
+        values: normalizeCSV(
+          Array.isArray(opt.values) ? opt.values.join(",") : opt.values
+        ),
+      }));
+      const featuredImage = formData.images[featuredImageIndex] || formData.images[0];
       const productData = {
-        title: formData.title,
-        handle: formData.handle || slugify(formData.title),
+        title: formData.title.trim(),
+        handle: normalizedHandle,
         description: formData.description || null,
         description_html: formData.description_html || null,
         is_bestseller: !!formData.is_bestseller,
         is_featured: !!formData.is_featured,
-        featured_image_url: formData.images[0]?.url || null,
-        featured_image_alt:
-          formData.images[0]?.alt_text || formData.title,
+        featured_image_url: featuredImage?.url || null,
+        featured_image_alt: featuredImage?.alt_text || formData.title.trim(),
         images: formData.images,
-        options: formData.options.map((opt) => ({
-          name: opt.name,
-          values: Array.isArray(opt.values)
-            ? opt.values
-            : opt.values
-                .split(",")
-                .map((v) => v.trim())
-                .filter((v) => v),
-        })),
+        options: normalizedOptions,
         variants: formData.variants.map((v) => ({
           title: v.title,
           sku: v.sku || null,
@@ -318,6 +595,9 @@ export default function AdminProductsPage() {
         setShowForm(false);
         setEditingId(null);
         setFormData({ ...EMPTY_PRODUCT });
+        setFeaturedImageIndex(0);
+        setHandleManuallyEdited(false);
+        setFieldErrors({});
         fetchProducts();
       }
     } catch (err) {
@@ -422,6 +702,7 @@ export default function AdminProductsPage() {
     }
 
     setFormData({ ...formData, images: newImages });
+    if (newImages.length === 1) setFeaturedImageIndex(0);
     setUploading(false);
     // Reset file input
     e.target.value = "";
@@ -429,6 +710,16 @@ export default function AdminProductsPage() {
 
   const removeImage = (index) => {
     const updated = formData.images.filter((_, i) => i !== index);
+    let nextFeatured = featuredImageIndex;
+    if (index === featuredImageIndex) {
+      nextFeatured = 0;
+      if (updated.length > 0) {
+        toast.info("Featured image removed. Assigned the next image.");
+      }
+    } else if (index < featuredImageIndex) {
+      nextFeatured = Math.max(0, featuredImageIndex - 1);
+    }
+    setFeaturedImageIndex(nextFeatured);
     setFormData({ ...formData, images: updated });
   };
 
@@ -491,6 +782,47 @@ export default function AdminProductsPage() {
     toast.success(`Generated ${variants.length} variants`);
   };
 
+  const generateCommonVariants = () => {
+    const karatOption = formData.options.find(
+      (option) => option.name?.toLowerCase() === "gold karat"
+    );
+    const colorOption = formData.options.find(
+      (option) => option.name?.toLowerCase() === "gold color"
+    );
+    const karats = normalizeCSV(
+      Array.isArray(karatOption?.values)
+        ? karatOption.values.join(",")
+        : karatOption?.values
+    );
+    const colors = normalizeCSV(
+      Array.isArray(colorOption?.values)
+        ? colorOption.values.join(",")
+        : colorOption?.values
+    );
+
+    if (karats.length === 0 || colors.length === 0) {
+      showMessage(
+        "error",
+        "Add Gold Karat and Gold Color options to generate common variants"
+      );
+      return;
+    }
+
+    const combos = cartesian(karats, colors);
+    const variants = combos.map((combo) => ({
+      title: combo.join(" / "),
+      sku: "",
+      price_amount: 0,
+      available_for_sale: true,
+      selected_options: [
+        { option_name: "Gold Karat", option_value: combo[0] },
+        { option_name: "Gold Color", option_value: combo[1] },
+      ],
+    }));
+    setFormData((prev) => ({ ...prev, variants }));
+    toast.success(`Generated ${variants.length} karat-color variants`);
+  };
+
   const updateVariant = (index, field, value) => {
     const updated = [...formData.variants];
     updated[index] = { ...updated[index], [field]: value };
@@ -503,6 +835,13 @@ export default function AdminProductsPage() {
   };
 
   // ========== Filtering + Sorting ==========
+
+  const normalizedCurrentHandle = (formData.handle || slugify(formData.title || "")).trim();
+  const hasHandleConflict = !!products.find(
+    (product) =>
+      product.handle?.toLowerCase() === normalizedCurrentHandle.toLowerCase() &&
+      product.id !== editingId
+  );
 
   const filteredProducts = products
     .filter((p) => {
@@ -725,35 +1064,61 @@ export default function AdminProductsPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Title *
                     </label>
-                    <input
-                      type="text"
+                    <TypeaheadInput
                       value={formData.title}
-                      onChange={(e) => {
-                        const title = e.target.value;
-                        setFormData({
-                          ...formData,
+                      onChange={(title) => {
+                        setFieldErrors((prev) => ({ ...prev, title: undefined }));
+                        setFormData((prev) => ({
+                          ...prev,
                           title,
-                          handle: editingId
-                            ? formData.handle
-                            : slugify(title),
-                        });
+                          handle:
+                            handleManuallyEdited || editingId
+                              ? prev.handle
+                              : slugify(title),
+                        }));
                       }}
+                      onSelect={(value) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          title: value,
+                          handle:
+                            handleManuallyEdited || editingId
+                              ? prev.handle
+                              : slugify(value),
+                        }))
+                      }
+                      onQuery={(query) => requestSuggestions("title", query)}
+                      suggestions={suggestionsByField.title}
                       placeholder="e.g. Luna Diamond Pendant"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      inputClassName="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      hint="Used for search and PDP name."
+                      error={fieldErrors.title}
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Handle (URL slug)
                     </label>
-                    <input
-                      type="text"
+                    <TypeaheadInput
                       value={formData.handle}
-                      onChange={(e) =>
-                        setFormData({ ...formData, handle: e.target.value })
-                      }
+                      onChange={(handle) => {
+                        setHandleManuallyEdited(true);
+                        setFieldErrors((prev) => ({ ...prev, handle: undefined }));
+                        setFormData((prev) => ({ ...prev, handle: slugify(handle) }));
+                      }}
+                      onSelect={(value) => {
+                        setHandleManuallyEdited(true);
+                        setFormData((prev) => ({ ...prev, handle: slugify(value) }));
+                      }}
+                      onQuery={(query) => requestSuggestions("handle", query)}
+                      suggestions={suggestionsByField.handle}
                       placeholder="luna-diamond-pendant"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600"
+                      inputClassName="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600"
+                      hint={`Preview: /product/${normalizedCurrentHandle || "your-handle"}`}
+                      error={
+                        fieldErrors.handle ||
+                        (hasHandleConflict ? "Handle already exists." : undefined)
+                      }
                     />
                   </div>
                   <div className="md:col-span-2">
@@ -808,6 +1173,27 @@ export default function AdminProductsPage() {
                       </label>
                     </div>
                   </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Quick Presets
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.keys(PRESETS).map((presetName) => (
+                        <button
+                          key={presetName}
+                          type="button"
+                          onClick={() => applyPreset(presetName)}
+                          className="px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50"
+                        >
+                          {presetName} preset
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Presets add common options and pricing defaults. Existing custom
+                      values are never overwritten silently.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
@@ -821,22 +1207,42 @@ export default function AdminProductsPage() {
               />
               {openSections.collections && (
                 <div className="pb-4 space-y-3">
+                  <TypeaheadInput
+                    value={collectionSearch}
+                    onChange={setCollectionSearch}
+                    onSelect={(value) => {
+                      setCollectionSearch(value);
+                      const matched = collections.find(
+                        (collection) =>
+                          collection.title.toLowerCase() === value.toLowerCase()
+                      );
+                      if (matched && !selectedCollectionIds.includes(matched.id)) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          collection_ids: [...(prev.collection_ids || []), matched.id],
+                        }));
+                      }
+                    }}
+                    onQuery={(query) => requestSuggestions("collection", query)}
+                    suggestions={suggestionsByField.collection}
+                    placeholder="Search collections..."
+                    inputClassName="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    hint="Type to filter. Press Enter on a suggestion to select it."
+                  />
                   {collections.length > 0 ? (
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                      {collections.map((c) => (
+                      {filteredCollections.map((c) => (
                         <label
                           key={c.id}
                           className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer text-sm transition-colors ${
-                            (formData.collection_ids || []).includes(c.id)
+                            selectedCollectionIds.includes(c.id)
                               ? "border-blue-500 bg-blue-50 text-blue-700"
                               : "border-gray-200 hover:border-gray-300"
                           }`}
                         >
                           <input
                             type="checkbox"
-                            checked={(formData.collection_ids || []).includes(
-                              c.id
-                            )}
+                            checked={selectedCollectionIds.includes(c.id)}
                             onChange={(e) => {
                               const ids = formData.collection_ids || [];
                               setFormData({
@@ -923,19 +1329,33 @@ export default function AdminProductsPage() {
               />
               {openSections.images && (
                 <div className="pb-4">
+                  <p className="text-xs text-gray-500 mb-2">
+                    Featured image is used in list cards and storefront cards.
+                  </p>
                   <div className="flex flex-wrap gap-4 mb-4">
                     {formData.images.map((img, i) => (
-                      <div key={i} className="relative group">
+                      <div key={i} className="relative group w-24">
                         <img
                           src={img.url}
                           alt={img.alt_text || "Product image"}
                           className="w-24 h-24 object-cover rounded-lg border border-gray-200"
                         />
-                        {i === 0 && (
+                        {i === featuredImageIndex && (
                           <span className="absolute top-0 left-0 bg-[#0a1833] text-white text-[10px] px-1.5 py-0.5 rounded-tl-lg rounded-br-lg">
                             Featured
                           </span>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => setFeaturedImage(i)}
+                          className={`mt-1 w-full rounded-md border px-2 py-1 text-[11px] ${
+                            i === featuredImageIndex
+                              ? "border-[#0a1833] bg-[#0a1833] text-white"
+                              : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                          }`}
+                        >
+                          Set as Featured
+                        </button>
                         <button
                           type="button"
                           onClick={() => removeImage(i)}
@@ -975,13 +1395,15 @@ export default function AdminProductsPage() {
                       className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && e.target.value) {
+                          const nextImages = [
+                            ...formData.images,
+                            { url: e.target.value, alt_text: "" },
+                          ];
                           setFormData({
                             ...formData,
-                            images: [
-                              ...formData.images,
-                              { url: e.target.value, alt_text: "" },
-                            ],
+                            images: nextImages,
                           });
+                          if (formData.images.length === 0) setFeaturedImageIndex(0);
                           e.target.value = "";
                         }
                       }}
@@ -1006,27 +1428,28 @@ export default function AdminProductsPage() {
                   {formData.options.map((opt, i) => (
                     <div key={i} className="flex gap-3 items-start">
                       <div className="flex-1">
-                        <input
-                          type="text"
+                        <TypeaheadInput
                           value={opt.name}
-                          onChange={(e) =>
-                            updateOption(i, "name", e.target.value)
-                          }
+                          onChange={(value) => updateOption(i, "name", value)}
+                          onSelect={(value) => updateOption(i, "name", value)}
+                          onQuery={(query) => requestSuggestions("option_name", query)}
+                          suggestions={suggestionsByField.option_name}
                           placeholder="Option name (e.g. Gold Karat)"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-1"
+                          inputClassName="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-1"
+                          hint="Use standard names like Gold Karat, Gold Color, Ring Size."
                         />
-                        <input
-                          type="text"
+                        <TagTypeaheadInput
                           value={
                             Array.isArray(opt.values)
                               ? opt.values.join(", ")
                               : opt.values
                           }
-                          onChange={(e) =>
-                            updateOption(i, "values", e.target.value)
-                          }
+                          onChange={(value) => updateOption(i, "values", value)}
+                          onQuery={(query) => requestSuggestions("option_value", query)}
+                          suggestions={suggestionsByField.option_value}
                           placeholder="Values (comma-separated: 10K, 14K, 18K)"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600"
+                          inputClassName="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600"
+                          hint="Comma-separated or select from suggestions."
                         />
                       </div>
                       <button
@@ -1055,6 +1478,15 @@ export default function AdminProductsPage() {
                         className="flex items-center gap-1 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
                       >
                         Generate Variants
+                      </button>
+                    )}
+                    {formData.options.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={generateCommonVariants}
+                        className="flex items-center gap-1 px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+                      >
+                        Generate Common Variants
                       </button>
                     )}
                   </div>
@@ -1168,6 +1600,9 @@ export default function AdminProductsPage() {
               />
               {openSections.pricing && (
                 <div className="pb-4">
+                  {fieldErrors.pricing && (
+                    <p className="mb-2 text-xs text-red-600">{fieldErrors.pricing}</p>
+                  )}
                   {!formData.pricing ? (
                     <div className="flex items-center gap-3">
                       <p className="text-sm text-gray-500">
@@ -1302,21 +1737,44 @@ export default function AdminProductsPage() {
                               <label className="block text-xs text-gray-600 mb-1">
                                 {f.label}
                               </label>
-                              <input
-                                type="text"
-                                value={formData.pricing[f.key]}
-                                onChange={(e) =>
-                                  setFormData({
-                                    ...formData,
-                                    pricing: {
-                                      ...formData.pricing,
-                                      [f.key]: e.target.value,
-                                    },
-                                  })
-                                }
-                                placeholder={f.placeholder}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                              />
+                              {["diamond_shapes", "total_diamonds", "diamond_weight"].includes(
+                                f.key
+                              ) ? (
+                                <TagTypeaheadInput
+                                  value={formData.pricing[f.key]}
+                                  onChange={(value) =>
+                                    setFormData({
+                                      ...formData,
+                                      pricing: { ...formData.pricing, [f.key]: value },
+                                    })
+                                  }
+                                  onQuery={(query) => requestSuggestions(f.key, query)}
+                                  suggestions={suggestionsByField[f.key]}
+                                  placeholder={f.placeholder}
+                                  inputClassName="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                  hint={
+                                    f.key === "diamond_weight"
+                                      ? "Use carat values like 0.10, 0.25."
+                                      : undefined
+                                  }
+                                />
+                              ) : (
+                                <input
+                                  type="text"
+                                  value={formData.pricing[f.key]}
+                                  onChange={(e) =>
+                                    setFormData({
+                                      ...formData,
+                                      pricing: {
+                                        ...formData.pricing,
+                                        [f.key]: e.target.value,
+                                      },
+                                    })
+                                  }
+                                  placeholder={f.placeholder}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                />
+                              )}
                             </div>
                           ))}
                         </div>
@@ -1327,6 +1785,9 @@ export default function AdminProductsPage() {
                         <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
                           Price Breakdown (INR)
                         </h4>
+                        <p className="text-xs text-gray-500 mb-2">
+                          Enter whole INR amounts. GST should be entered as an amount, not percentage.
+                        </p>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                           {[
                             {
