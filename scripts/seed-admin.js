@@ -32,7 +32,7 @@ function loadEnv() {
 
 loadEnv()
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL||process.env.VITE_SUPABASE_URL_PROXY
+const supabaseUrl = process.env.VITE_SUPABASE_URL
 const supabaseKey = process.env.VITE_SUPABASE_SERVICE_ROLE_KEY
 
 if (!supabaseUrl || !supabaseKey) {
@@ -87,3 +87,4 @@ async function seed() {
 }
 
 seed()
+

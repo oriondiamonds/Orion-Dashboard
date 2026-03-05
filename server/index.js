@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url'
 import { registerAuthRoutes } from './routes/auth.js'
 import { registerTrackingRoutes } from './routes/tracking.js'
 import { registerOrdersRoutes } from './routes/orders.js'
+import { registerProductsRoutes } from './routes/products.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -17,6 +18,7 @@ app.use(express.json())
 registerAuthRoutes(app)
 registerTrackingRoutes(app)
 registerOrdersRoutes(app)
+registerProductsRoutes(app)
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' })

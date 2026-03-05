@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import bcrypt from 'bcryptjs'
 
 const supabase = createClient(
-  process.env.VITE_SUPABASE_URL||process.env.VITE_SUPABASE_URL_PROXY,
+  process.env.VITE_SUPABASE_URL,
   process.env.VITE_SUPABASE_SERVICE_ROLE_KEY,
   { auth: { persistSession: false, autoRefreshToken: false } }
 )
@@ -58,3 +58,4 @@ export default async function handler(req, res) {
     res.status(500).json({ error: 'Internal server error' })
   }
 }
+

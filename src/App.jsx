@@ -6,6 +6,7 @@ import LoginPage from './auth/LoginPage.jsx'
 import Layout from './components/Layout.jsx'
 import TrackingPage from './modules/tracking/TrackingPage.jsx'
 import OrdersPage from './modules/orders/OrdersPage.jsx'
+import ProductsPage from './modules/products/ProductsPage.jsx'
 
 // Placeholder pages — will be replaced as each module is built
 function PlaceholderPage({ title }) {
@@ -79,7 +80,7 @@ export default function App() {
                 path="products"
                 element={
                   <ProtectedRoute module="products">
-                    <PlaceholderPage title="Products" />
+                    <ProductsPage />
                   </ProtectedRoute>
                 }
               />
