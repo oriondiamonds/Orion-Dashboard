@@ -65,21 +65,43 @@ export function registerProductsRoutes(app) {
         return res.json({ success: true, product })
       }
 
-      const [productsRes, pricingRes, collectionsRes, cpRes] = await Promise.all([
-        supabase
-          .from('products')
-          .select(`
-            id,
-            handle,
-            title,
-            featured_image_url,
-            is_bestseller,
-            is_featured,
-            created_at,
-            variants:product_variants(id),
-            options:product_options(id)
-          `)
-          .order('created_at', { ascending: false }),
+      let productsRes = await supabase
+        .from('products')
+        .select(`
+          id,
+          handle,
+          title,
+          featured_image_url,
+          is_bestseller,
+          is_featured,
+          created_at,
+          variants:product_variants(id),
+          options:product_options(id)
+        `)
+        .order('created_at', { ascending: false })
+
+      // Backward-compatible fallback for DBs that don't yet have flag columns
+      if (productsRes.error) {
+        const msg = String(productsRes.error.message || '').toLowerCase()
+        const missingFlags = msg.includes('is_bestseller') || msg.includes('is_featured')
+        if (missingFlags) {
+          console.warn('Products flag columns missing in DB. Falling back to legacy select.')
+          productsRes = await supabase
+            .from('products')
+            .select(`
+              id,
+              handle,
+              title,
+              featured_image_url,
+              created_at,
+              variants:product_variants(id),
+              options:product_options(id)
+            `)
+            .order('created_at', { ascending: false })
+        }
+      }
+
+      const [pricingRes, collectionsRes, cpRes] = await Promise.all([
         supabase.from('product_prices').select('handle'),
         supabase.from('collections').select('id, handle, title').order('title'),
         supabase.from('collection_products').select('collection_id, product_id'),
@@ -412,4 +434,3 @@ export function registerProductsRoutes(app) {
     res.status(501).json({ error: 'Direct upload is not enabled. Paste image URLs instead.' })
   })
 }
-
