@@ -7,6 +7,8 @@ import Layout from './components/Layout.jsx'
 import TrackingPage from './modules/tracking/TrackingPage.jsx'
 import OrdersPage from './modules/orders/OrdersPage.jsx'
 import ProductsPage from './modules/products/ProductsPage.jsx'
+import CouponsPage from './modules/coupons/CouponsPage.jsx'
+import AgenciesPage from './modules/agencies/AgenciesPage.jsx'
 
 // Placeholder pages — will be replaced as each module is built
 function PlaceholderPage({ title }) {
@@ -88,7 +90,7 @@ export default function App() {
                 path="coupons"
                 element={
                   <ProtectedRoute module="coupons">
-                    <PlaceholderPage title="Coupons" />
+                    <CouponsPage />
                   </ProtectedRoute>
                 }
               />
@@ -96,7 +98,7 @@ export default function App() {
                 path="agencies"
                 element={
                   <ProtectedRoute module="agencies">
-                    <PlaceholderPage title="Agencies" />
+                    <AgenciesPage />
                   </ProtectedRoute>
                 }
               />
