@@ -11,7 +11,6 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext.jsx'
-import { hasPermission } from '../../auth/permissions.js'
 import { useToast } from '../../components/Toast.jsx'
 
 const STATUS_ORDER = [
@@ -67,9 +66,9 @@ function formatDateTime(dateStr) {
 const LIMIT = 25
 
 export default function OrdersPage() {
-  const { user } = useAuth()
+  const { checkPermission } = useAuth()
   const { showToast } = useToast()
-  const canWrite = hasPermission(user?.role, 'orders', 'write')
+  const canWrite = checkPermission('orders', 'write')
 
   const [orders, setOrders] = useState([])
   const [total, setTotal] = useState(0)

@@ -6,7 +6,7 @@
  * Actions: read, write
  */
 
-const PERMISSIONS = {
+export const PERMISSIONS = {
   super_admin: {
     tracking: ['read'],
     orders: ['read', 'write'],
@@ -54,11 +54,24 @@ export function getAccessibleModules(role) {
 }
 
 /**
+ * Resolve effective permissions for a user (custom overrides role if set)
+ */
+export function getEffectivePermissions(user) {
+  if (!user) return {}
+  const custom = user.custom_permissions
+  if (custom && Object.keys(custom).length > 0) return custom
+  return PERMISSIONS[user.role] || {}
+}
+
+/**
  * Check if role can write to a module
  */
 export function canWrite(role, module) {
   return hasPermission(role, module, 'write')
 }
+
+// All modules in sidebar order — used for permissions editor
+export const ALL_MODULES = ['tracking', 'orders', 'products', 'coupons', 'agencies', 'pricing', 'admin-users']
 
 export const ROLES = ['super_admin', 'manager', 'marketing', 'viewer']
 

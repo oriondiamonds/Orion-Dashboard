@@ -9,6 +9,7 @@ import OrdersPage from './modules/orders/OrdersPage.jsx'
 import ProductsPage from './modules/products/ProductsPage.jsx'
 import CouponsPage from './modules/coupons/CouponsPage.jsx'
 import AgenciesPage from './modules/agencies/AgenciesPage.jsx'
+import AdminUsersPage from './modules/admin-users/AdminUsersPage.jsx'
 
 // Placeholder pages — will be replaced as each module is built
 function PlaceholderPage({ title }) {
@@ -114,7 +115,7 @@ export default function App() {
                 path="admin-users"
                 element={
                   <ProtectedRoute module="admin-users">
-                    <PlaceholderPage title="Admin Users" />
+                    <AdminUsersPage />
                   </ProtectedRoute>
                 }
               />

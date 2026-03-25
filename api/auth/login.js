@@ -21,7 +21,7 @@ export default async function handler(req, res) {
 
     const { data: user, error } = await supabase
       .from('admin_users')
-      .select('id, email, password_hash, display_name, role, is_active')
+      .select('id, email, password_hash, display_name, role, is_active, custom_permissions')
       .eq('email', email.toLowerCase().trim())
       .single()
 
@@ -51,6 +51,7 @@ export default async function handler(req, res) {
         email: user.email,
         display_name: user.display_name,
         role: user.role,
+        custom_permissions: user.custom_permissions || null,
       },
     })
   } catch (err) {

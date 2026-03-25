@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext.jsx'
-import { getAccessibleModules, ROLE_LABELS } from '../auth/permissions.js'
+import { ROLE_LABELS } from '../auth/permissions.js'
 import {
   BarChart3,
   ShoppingCart,
@@ -19,13 +19,12 @@ const MODULE_NAV = {
   products: { label: 'Products', icon: Package, path: '/products' },
   coupons: { label: 'Coupons', icon: Tag, path: '/coupons' },
   agencies: { label: 'Agencies', icon: Building2, path: '/agencies' },
-  pricing: { label: 'Pricing', icon: IndianRupee, path: '/pricing' },
+  // pricing: { label: 'Pricing', icon: IndianRupee, path: '/pricing' },
   'admin-users': { label: 'Admin Users', icon: Users, path: '/admin-users' },
 }
 
 export default function Sidebar() {
-  const { user, logout } = useAuth()
-  const modules = getAccessibleModules(user.role)
+  const { user, logout, accessibleModules: modules } = useAuth()
 
   return (
     <aside className="w-60 bg-gray-900 text-white flex flex-col h-screen sticky top-0 shrink-0 overflow-y-auto">

@@ -76,16 +76,14 @@ export default async function handler(req, res) {
 
       if (!id) return res.status(400).json({ success: false, error: 'Agency ID is required' })
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('agencies')
-        .update({ is_active: false })
+        .delete()
         .eq('id', id)
-        .select()
-        .single()
 
       if (error) throw error
 
-      return res.json({ success: true, agency: data })
+      return res.json({ success: true, id })
     }
 
     res.status(405).json({ error: 'Method not allowed' })

@@ -5,6 +5,7 @@ import { registerOrdersRoutes } from './routes/orders.js'
 import { registerProductsRoutes } from './routes/products.js'
 import { registerCouponsRoutes } from './routes/coupons.js'
 import { registerAgenciesRoutes } from './routes/agencies.js'
+import { registerAdminUsersRoutes } from './routes/admin-users.js'
 
 /**
  * Vite plugin that mounts API routes directly into Vite's dev server.
@@ -23,6 +24,7 @@ export function apiPlugin() {
       registerProductsRoutes(app)
       registerCouponsRoutes(app)
       registerAgenciesRoutes(app)
+      registerAdminUsersRoutes(app)
 
       app.get('/api/health', (req, res) => {
         res.json({ status: 'ok' })

@@ -8,6 +8,7 @@ import { registerOrdersRoutes } from './routes/orders.js'
 import { registerProductsRoutes } from './routes/products.js'
 import { registerCouponsRoutes } from './routes/coupons.js'
 import { registerAgenciesRoutes } from './routes/agencies.js'
+import { registerAdminUsersRoutes } from './routes/admin-users.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -23,6 +24,7 @@ registerOrdersRoutes(app)
 registerProductsRoutes(app)
 registerCouponsRoutes(app)
 registerAgenciesRoutes(app)
+registerAdminUsersRoutes(app)
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' })

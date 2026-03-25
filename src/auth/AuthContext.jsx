@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useCallback } from 'react'
+import { createContext, useContext, useState, useCallback, useMemo } from 'react'
 import { login as loginService } from './auth.service.js'
+import { getEffectivePermissions } from './permissions.js'
 
 const AuthContext = createContext(null)
 
@@ -40,8 +41,22 @@ export function AuthProvider({ children }) {
     setUser(null)
   }, [])
 
+  // Checks permission using custom_permissions if set, else role defaults
+  const checkPermission = useCallback((module, action = 'read') => {
+    if (!user) return false
+    const perms = getEffectivePermissions(user)
+    return (perms[module] || []).includes(action)
+  }, [user])
+
+  // All modules the current user can read (for sidebar)
+  const accessibleModules = useMemo(() => {
+    if (!user) return []
+    const perms = getEffectivePermissions(user)
+    return Object.keys(perms).filter((mod) => perms[mod].includes('read'))
+  }, [user])
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading, error }}>
+    <AuthContext.Provider value={{ user, login, logout, loading, error, checkPermission, accessibleModules }}>
       {children}
     </AuthContext.Provider>
   )

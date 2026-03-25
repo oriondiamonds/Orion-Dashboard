@@ -1,15 +1,14 @@
 import { useState, useEffect } from 'react'
 import { Building2, Plus, Edit2, Trash2, Save, X, ToggleLeft, ToggleRight } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext.jsx'
-import { hasPermission } from '../../auth/permissions.js'
 import { useToast } from '../../components/Toast.jsx'
 
 const EMPTY_FORM = { name: '', contact_email: '' }
 
 export default function AgenciesPage() {
-  const { user } = useAuth()
-  const { showToast } = useToast()
-  const canWrite = hasPermission(user?.role, 'agencies', 'write')
+  const { checkPermission } = useAuth()
+  const toast = useToast()
+  const canWrite = checkPermission('agencies', 'write')
 
   const [agencies, setAgencies] = useState([])
   const [loading, setLoading] = useState(true)
@@ -27,9 +26,9 @@ export default function AgenciesPage() {
       const res = await fetch('/api/agencies')
       const data = await res.json()
       if (data.success) setAgencies(data.agencies)
-      else showToast(data.error || 'Failed to load agencies', 'error')
+      else toast.error(data.error || 'Failed to load agencies')
     } catch {
-      showToast('Failed to load agencies', 'error')
+      toast.error('Failed to load agencies')
     } finally {
       setLoading(false)
     }
@@ -37,7 +36,7 @@ export default function AgenciesPage() {
 
   const handleAdd = async () => {
     if (!formData.name.trim()) {
-      showToast('Agency name is required', 'error')
+      toast.error('Agency name is required')
       return
     }
     setSaving(true)
@@ -49,15 +48,15 @@ export default function AgenciesPage() {
       })
       const data = await res.json()
       if (data.success) {
-        showToast('Agency added', 'success')
+        toast.success('Agency added')
         setFormData({ ...EMPTY_FORM })
         setShowAddForm(false)
         loadAgencies()
       } else {
-        showToast(data.error || 'Failed to add agency', 'error')
+        toast.error(data.error || 'Failed to add agency')
       }
     } catch {
-      showToast('Failed to add agency', 'error')
+      toast.error('Failed to add agency')
     } finally {
       setSaving(false)
     }
@@ -73,14 +72,14 @@ export default function AgenciesPage() {
       })
       const data = await res.json()
       if (data.success) {
-        showToast('Agency updated', 'success')
+        toast.success('Agency updated')
         setEditingId(null)
         loadAgencies()
       } else {
-        showToast(data.error || 'Failed to update agency', 'error')
+        toast.error(data.error || 'Failed to update agency')
       }
     } catch {
-      showToast('Failed to update agency', 'error')
+      toast.error('Failed to update agency')
     } finally {
       setSaving(false)
     }
@@ -95,13 +94,13 @@ export default function AgenciesPage() {
       })
       const data = await res.json()
       if (data.success) {
-        showToast(agency.is_active ? 'Agency deactivated' : 'Agency activated', 'success')
+        toast.success(agency.is_active ? 'Agency deactivated' : 'Agency activated')
         loadAgencies()
       } else {
-        showToast(data.error || 'Failed to update', 'error')
+        toast.error(data.error || 'Failed to update')
       }
     } catch {
-      showToast('Failed to update agency', 'error')
+      toast.error('Failed to update agency')
     }
   }
 
@@ -114,14 +113,14 @@ export default function AgenciesPage() {
       })
       const data = await res.json()
       if (data.success) {
-        showToast('Agency deactivated', 'success')
+        toast.success('Agency deleted')
         setDeleteConfirmId(null)
         loadAgencies()
       } else {
-        showToast(data.error || 'Failed to deactivate', 'error')
+        toast.error(data.error || 'Failed to delete')
       }
     } catch {
-      showToast('Failed to deactivate agency', 'error')
+      toast.error('Failed to deactivate agency')
     }
   }
 
@@ -310,7 +309,7 @@ export default function AgenciesPage() {
                               </button>
                               {deleteConfirmId === agency.id ? (
                                 <div className="flex items-center gap-1 ml-1">
-                                  <span className="text-xs text-red-600 font-medium whitespace-nowrap">Deactivate?</span>
+                                  <span className="text-xs text-red-600 font-medium whitespace-nowrap">Delete permanently?</span>
                                   <button
                                     onClick={() => handleDelete(agency.id)}
                                     className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition"
@@ -328,7 +327,7 @@ export default function AgenciesPage() {
                                 <button
                                   onClick={() => setDeleteConfirmId(agency.id)}
                                   className="p-1.5 text-red-500 hover:bg-red-50 rounded transition"
-                                  title="Deactivate"
+                                  title="Delete permanently"
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>

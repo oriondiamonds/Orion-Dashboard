@@ -83,26 +83,24 @@ export function registerAgenciesRoutes(app) {
     }
   })
 
-  // DELETE /api/agencies — soft delete (set is_active = false)
+  // DELETE /api/agencies — permanent delete
   app.delete('/api/agencies', async (req, res) => {
     try {
       const { id } = req.body
 
       if (!id) return res.status(400).json({ success: false, error: 'Agency ID is required' })
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('agencies')
-        .update({ is_active: false })
+        .delete()
         .eq('id', id)
-        .select()
-        .single()
 
       if (error) throw error
 
-      res.json({ success: true, agency: data })
+      res.json({ success: true, id })
     } catch (err) {
-      console.error('Failed to deactivate agency:', err)
-      res.status(500).json({ success: false, error: 'Failed to deactivate agency' })
+      console.error('Failed to delete agency:', err)
+      res.status(500).json({ success: false, error: 'Failed to delete agency' })
     }
   })
 }
