@@ -73,7 +73,7 @@ const INPUT = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:
 
 export default function CouponsPage() {
   const { user } = useAuth()
-  const { showToast } = useToast()
+  const toast = useToast()
   const canWrite = hasPermission(user?.role, 'coupons', 'write')
 
   const [coupons, setCoupons] = useState([])
@@ -102,9 +102,9 @@ export default function CouponsPage() {
       const res = await fetch('/api/coupons')
       const data = await res.json()
       if (data.success) setCoupons(data.coupons)
-      else showToast(data.error || 'Failed to load coupons', 'error')
+      else toast.error(data.error || 'Failed to load coupons')
     } catch {
-      showToast('Failed to load coupons', 'error')
+      toast.error('Failed to load coupons')
     } finally {
       setLoading(false)
     }
@@ -176,7 +176,7 @@ export default function CouponsPage() {
 
   const handleSave = async () => {
     if (!formData.code || !formData.discount_value) {
-      showToast('Code and discount value are required', 'error')
+      toast.error('Code and discount value are required')
       return
     }
 
@@ -224,15 +224,15 @@ export default function CouponsPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        showToast(data.error || 'Failed to save', 'error')
+        toast.error(data.error || 'Failed to save')
       } else {
-        showToast(editingId ? 'Coupon updated' : 'Coupon created', 'success')
+        toast.success(editingId ? 'Coupon updated' : 'Coupon created')
         setShowForm(false)
         setEditingId(null)
         fetchCoupons()
       }
     } catch {
-      showToast('Failed to save coupon', 'error')
+      toast.error('Failed to save coupon')
     } finally {
       setSaving(false)
     }
@@ -247,13 +247,13 @@ export default function CouponsPage() {
       })
       const data = await res.json()
       if (!res.ok) {
-        showToast(data.error || 'Failed to toggle', 'error')
+        toast.error(data.error || 'Failed to toggle')
       } else {
-        showToast(coupon.is_active ? 'Coupon deactivated' : 'Coupon activated', 'success')
+        toast.success(coupon.is_active ? 'Coupon deactivated' : 'Coupon activated')
         fetchCoupons()
       }
     } catch {
-      showToast('Failed to toggle coupon', 'error')
+      toast.error('Failed to toggle coupon')
     }
   }
 
@@ -266,14 +266,14 @@ export default function CouponsPage() {
       })
       const data = await res.json()
       if (!res.ok) {
-        showToast(data.error || 'Failed to delete', 'error')
+        toast.error(data.error || 'Failed to delete')
       } else {
-        showToast('Coupon deleted', 'success')
+        toast.success('Coupon deleted')
         setDeleteConfirmId(null)
         fetchCoupons()
       }
     } catch {
-      showToast('Failed to delete coupon', 'error')
+      toast.error('Failed to delete coupon')
     }
   }
 
@@ -281,7 +281,7 @@ export default function CouponsPage() {
     const base = STOREFRONT_URL || window.location.origin
     const link = `${base}/?coupon=${code}`
     navigator.clipboard.writeText(link)
-    showToast('Referral link copied!', 'success')
+    toast.success('Referral link copied!')
   }
 
   return (

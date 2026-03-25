@@ -67,7 +67,7 @@ const LIMIT = 25
 
 export default function OrdersPage() {
   const { checkPermission } = useAuth()
-  const { showToast } = useToast()
+  const toast = useToast()
   const canWrite = checkPermission('orders', 'write')
 
   const [orders, setOrders] = useState([])
@@ -100,7 +100,7 @@ export default function OrdersPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        showToast(data.error || 'Failed to load orders', 'error')
+        toast.error(data.error || 'Failed to load orders')
         return
       }
 
@@ -109,11 +109,11 @@ export default function OrdersPage() {
       setPage(targetPage)
       setHasLoaded(true)
     } catch {
-      showToast('Failed to load orders', 'error')
+      toast.error('Failed to load orders')
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, search, showToast])
+  }, [statusFilter, search, toast])
 
   const handleStatusUpdate = async (orderId, newStatus) => {
     setUpdatingId(orderId)
@@ -126,14 +126,14 @@ export default function OrdersPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        showToast(data.error || 'Failed to update status', 'error')
+        toast.error(data.error || 'Failed to update status')
       } else {
-        showToast(`Status updated to ${STATUS_LABELS[newStatus] || newStatus}`, 'success')
+        toast.success(`Status updated to ${STATUS_LABELS[newStatus] || newStatus}`)
         setUpdateNote('')
         fetchOrders(page)
       }
     } catch {
-      showToast('Failed to update status', 'error')
+      toast.error('Failed to update status')
     } finally {
       setUpdatingId(null)
     }

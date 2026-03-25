@@ -410,7 +410,7 @@ export default function AdminUsersPage() {
               </thead>
               <tbody>
                 {users.map((u) => (
-                  <React.Fragment key={u.id}>
+                  <React.Fragment key={u.id ?? u.email}>
                     {/* Main row */}
                     <tr className={`border-t border-gray-100 transition ${editingId === u.id ? 'bg-indigo-50' : 'hover:bg-gray-50'}`}>
                       <td className="px-6 py-3">
