@@ -40,6 +40,7 @@ const EMPTY_PRICING = {
   weight_14k: "",
   weight_18k: "",
   diamond_shapes: "",
+  diamond_sizes: "",
   total_diamonds: "",
   diamond_weight: "",
   total_diamond_weight: "",
@@ -497,6 +498,7 @@ export default function AdminProductsPage() {
               weight_14k: p.pricing.weight_14k || "",
               weight_18k: p.pricing.weight_18k || "",
               diamond_shapes: p.pricing.diamond_shapes || "",
+              diamond_sizes: p.pricing.diamond_sizes || "",
               total_diamonds: p.pricing.total_diamonds || "",
               diamond_weight: p.pricing.diamond_weight || "",
               total_diamond_weight: p.pricing.total_diamond_weight || "",
@@ -1710,7 +1712,7 @@ export default function AdminProductsPage() {
                         <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
                           Diamond Info
                         </h4>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                           {[
                             {
                               key: "diamond_shapes",
@@ -1718,13 +1720,18 @@ export default function AdminProductsPage() {
                               placeholder: "Round, Pear",
                             },
                             {
+                              key: "diamond_sizes",
+                              label: "Diamond Sizes (mm)",
+                              placeholder: "1.25, 8.50X5.50",
+                            },
+                            {
                               key: "total_diamonds",
-                              label: "Total Diamonds",
+                              label: "Count per Shape",
                               placeholder: "10, 2",
                             },
                             {
                               key: "diamond_weight",
-                              label: "Diamond Weight (each)",
+                              label: "Weight each (ct)",
                               placeholder: "0.01, 0.25",
                             },
                             {
@@ -1737,7 +1744,7 @@ export default function AdminProductsPage() {
                               <label className="block text-xs text-gray-600 mb-1">
                                 {f.label}
                               </label>
-                              {["diamond_shapes", "total_diamonds", "diamond_weight"].includes(
+                              {["diamond_shapes", "diamond_sizes", "total_diamonds", "diamond_weight"].includes(
                                 f.key
                               ) ? (
                                 <TagTypeaheadInput
