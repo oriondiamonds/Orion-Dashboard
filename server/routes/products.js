@@ -1,4 +1,8 @@
+import multer from 'multer'
+import sharp from 'sharp'
 import { supabase } from '../supabase.js'
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } })
 
 function slugify(text = '') {
   return String(text)
@@ -504,8 +508,36 @@ export function registerProductsRoutes(app) {
     }
   })
 
-  // Placeholder endpoint: dashboard currently supports URL-based product images.
-  app.post('/api/products/upload', async (_req, res) => {
-    res.status(501).json({ error: 'Direct upload is not enabled. Paste image URLs instead.' })
+  // Upload image → convert to WebP → Supabase Storage → return public URL
+  app.post('/api/products/upload', upload.single('file'), async (req, res) => {
+    try {
+      const { handle } = req.body
+      if (!handle) return res.status(400).json({ error: 'handle is required' })
+      if (!req.file) return res.status(400).json({ error: 'No file provided' })
+
+      const stem     = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      const fname    = `${stem}.webp`
+      const path     = `${handle}/${fname}`
+
+      const webpBuffer = await sharp(req.file.buffer)
+        .resize(1080, null, { withoutEnlargement: true })
+        .webp({ quality: 80 })
+        .toBuffer()
+
+      const { error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(path, webpBuffer, { contentType: 'image/webp', upsert: true })
+
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(path)
+
+      res.json({ success: true, url: publicUrl })
+    } catch (err) {
+      console.error('[upload]', err)
+      res.status(500).json({ error: err.message })
+    }
   })
 }
